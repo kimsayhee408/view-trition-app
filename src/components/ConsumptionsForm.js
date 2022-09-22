@@ -7,7 +7,7 @@ function ConsumptionsForm(props) {
         Servings consumed:
         <input
           type="number"
-          onChange={(event) => props.onServingsChange(event.target.value)}
+          onChange={(event) => props.onServingAmountChange(event.target.value)}
         />
         <button type="button">Add to Diary</button>
       </span>

@@ -1,27 +1,15 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import ClickedItemDetails from "./ClickedItemDetails";
 
-function SearchResultRow(props) {
-  const rowClickHandler = (event) => {
-    const identifier = event.currentTarget.id; // Using currentTarget (vs target) bc we want to get id from the <tr>, not the <td>
-    props.onSearchRowClick(identifier);
-    // console.log(identifier);
-  };
-
-  return (
-    <tr id={props.food.fdcId} onClick={rowClickHandler}>
-      <td>{props.food.description || ""}</td>
-      <td>{props.food.dataType || ""}</td>
-      <td>{props.food.fdcId || ""}</td>
-    </tr>
-  );
-}
+import LoadingIndicator from "./UI/LoadingIndicator";
+import ErrorModal from "./UI/ErrorModal";
+import SearchResults from "./SearchResults";
 
 function FdcSearch() {
   const [fdcSearchResults, setFdcSearchResults] = useState([]);
   const [fdcSearchTerm, setFdcSearchTerm] = useState("");
   const fdcSearchInputRef = useRef();
-  const [clickedItem, setClickedItem] = useState({});
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadingError, setLoadingError] = useState(null); // if a error occurs, this state will attain a value --> in which case we will display <ErrorModal> instead of <SearchResults>
 
   const fetchFdcSearchResults = useCallback((query) => {
     if (query.trim().length < 2) {
@@ -50,22 +38,24 @@ function FdcSearch() {
 
     console.log("FETCHING");
 
+    setIsLoading(true);
     fetch(fdc_api_url)
-      .then((response) => response.json())
+      .then((response) => {
+        setIsLoading(false);
+        if (response.ok) {
+          return response.json();
+        }
+        throw new Error(
+          "Problem fetching data from  the Food Data Central database. Please try again later."
+        );
+      })
       .then((responseData) => {
         setFdcSearchResults(responseData.foods);
-        // const formattedResults = data.foods.map((food) => {
-        //   return {
-        //     fdcId: food.fdcId || "",
-        //     description: food.description || "",
-        //     dataType: food.dataType || "",
-        //   };
-        // });
-
-        // setFdcSearchResults(formattedResults);
       })
       .catch((err) => {
-        console.error(err);
+        console.log("CATCHING ERROR");
+        setLoadingError(err.message);
+        setIsLoading(false); // should reset to false even if error!!
       });
   }, []);
 
@@ -85,47 +75,10 @@ function FdcSearch() {
     fetchFdcSearchResults(fdcSearchInputRef.current.value); // clicking search button also works; uses ref to read value
   };
 
-  const onSearchRowClick = (clickedFoodId) => {
-    console.log(typeof clickedFoodId, clickedFoodId);
-    const matchingFoodInFdcSearchResults = fdcSearchResults.filter(
-      (food) => food.fdcId === Number(clickedFoodId) // fdcId value is a NUMBER; clickedFoodId is a STRING
-    );
-    console.log(matchingFoodInFdcSearchResults[0]);
-    setClickedItem(matchingFoodInFdcSearchResults[0]);
+  const clearError = () => {
+    setLoadingError(null);
+    setIsLoading(false);
   };
-
-  let displayContent;
-
-  const searchResultsTable = (
-    <table>
-      <thead>
-        <tr>
-          <th>Description</th>
-          <th>Data type</th>
-          <th>FDC ID</th>
-        </tr>
-      </thead>
-      <tbody>
-        {fdcSearchResults.map((food) => {
-          return (
-            <SearchResultRow
-              onSearchRowClick={onSearchRowClick}
-              key={food.fdcId}
-              food={food}
-            />
-          );
-        })}
-      </tbody>
-    </table>
-  );
-
-  if (fdcSearchTerm.trim() === "") {
-    displayContent = <p>Please enter a search.</p>;
-  } else if (fdcSearchResults.length === 0) {
-    displayContent = <p>No matching foods found. Please try another search.</p>;
-  } else {
-    displayContent = searchResultsTable;
-  }
 
   return (
     <div>
@@ -139,8 +92,13 @@ function FdcSearch() {
       <button onClick={searchButtonClickHandler} type="button">
         Search
       </button>
-      {displayContent}
-      <ClickedItemDetails item={clickedItem} />
+      {isLoading ? (
+        <LoadingIndicator />
+      ) : loadingError ? (
+        <ErrorModal onClose={clearError}>{loadingError}</ErrorModal>
+      ) : (
+        <SearchResults results={fdcSearchResults} />
+      )}
     </div>
   );
 }

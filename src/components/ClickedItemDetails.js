@@ -3,19 +3,42 @@ import { useState } from "react";
 import ConsumptionsForm from "./ConsumptionsForm";
 
 function ClickedItemDetails(props) {
-  // const [multiplier, setMultipler] = useState(1) ; to use later!! determine multiplier based on consumed amount and then apply multiplier to all the nutrient table values (wire up somehow)
-  console.log(props.item, "boo");
-
+  const [consumedGramWeight, setConsumedGramWeight] = useState(100);
+  const [enteredServingAmount, setEnteredServingAmount] = useState(1);
   const { item } = props;
 
-  let itemHeaderContent = (
+  const multiplier = (consumedGramWeight / 100) * enteredServingAmount;
+  console.log("multiplier", multiplier); // a constant simply derived from the two states; doesn't need to be a state
+
+  const itemHeaderContent = (
     <>
       <h2>{item.description || ""}</h2>
       <p>{item.foodCategory || ""}</p>
     </>
   );
 
-  const [enteredServingsValue, setEnteredServingsValue] = useState(1);
+  const defaultServingOption = <option value="100">100g</option>;
+
+  const servingOptions = item.foodMeasures ?? []; // some results from FDC do not have common foodMeasures
+  const servingSelectElement = servingOptions.length ? (
+    <select
+      onChange={(event) => {
+        console.log(event.target.value);
+        console.log(typeof event.target.value);
+        setConsumedGramWeight(Number(event.target.value));
+      }}
+    >
+      {defaultServingOption}
+      {servingOptions.map((servObj) => (
+        <option
+          key={servObj.id}
+          value={servObj.gramWeight}
+        >{`${servObj.disseminationText} (${servObj.gramWeight}g)`}</option>
+      ))}
+    </select>
+  ) : (
+    defaultServingOption
+  );
 
   const generateNutrientRowElement = (name, id) => {
     return (
@@ -24,7 +47,13 @@ function ClickedItemDetails(props) {
         <td>
           {item.foodNutrients?.filter(
             (nutrientObj) => nutrientObj.nutrientId === id
-          )[0]?.value ?? "-"}
+          )[0]?.value
+            ? (
+                item.foodNutrients?.filter(
+                  (nutrientObj) => nutrientObj.nutrientId === id
+                )[0]?.value * multiplier
+              ).toFixed(2)
+            : "-"}
           {/* using ?? instead of || because when a the nutrient amount is 0, we want to render 0 vs a dash*/}
         </td>
         <td>
@@ -36,8 +65,9 @@ function ClickedItemDetails(props) {
     );
   };
 
-  const handleServingsChange = (enteredNumberOfServings) => {
-    setEnteredServingsValue(Number(enteredNumberOfServings));
+  const handleServingAmountChange = (servingsInput) => {
+    console.log(`I ATE ${servingsInput} SERVINGS`);
+    setEnteredServingAmount(Number(servingsInput));
   };
 
   const carbohydratesTable = (
@@ -64,8 +94,8 @@ function ClickedItemDetails(props) {
         {generateNutrientRowElement(`   Omega-3`)}
         {generateNutrientRowElement(`   Omega-6`)}
         {generateNutrientRowElement(` Saturated`, 1258)}
-        {generateNutrientRowElement(` Trans-Fats, `)}
-        {generateNutrientRowElement(`Cholesterol, 1253`)}
+        {generateNutrientRowElement(` Trans-Fats`)}
+        {generateNutrientRowElement(`Cholesterol`, 1253)}
       </tbody>
     </table>
   );
@@ -154,7 +184,11 @@ function ClickedItemDetails(props) {
   return (
     <div>
       {itemHeaderContent}
-      <ConsumptionsForm onServingsChange={handleServingsChange} />
+      {servingSelectElement}
+      <ConsumptionsForm
+        onServingAmountChange={handleServingAmountChange}
+        servingOptions={servingOptions}
+      />
       {carbohydratesTable}
       {lipidsTable}
       {proteinTable}
